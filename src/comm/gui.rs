@@ -66,3 +66,94 @@ pub struct CompositeValveState {
     /// Actual state of the valve, determined using voltage and current measurements.
     pub actual: ValveState,
 }
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, MaxSize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SensorType {
+    /// Load cell, measuring force.
+    LoadCell,
+    /// Pressure transducer, which measure the pressure of a fluid.
+    Pt,
+    /// Current of the power tail of the board
+    RailCurrent,
+    /// Voltage of the power rail of the board.
+    RailVoltage,
+    /// Resistance thermometer, measuring temperature.
+    Rtd,
+    /// Thermocouple, measuring temperature.
+    Tc,
+    /// Valve, which can be actuated and read with voltage and current.
+    Valve,
+}
+
+impl SensorType {
+    /// Returns the channel types associated with this sensor type.
+    pub fn channel_types(self) -> &'static [ChannelType] {
+        match self {
+            Self::LoadCell => &[ChannelType::DifferentialSignal],
+            Self::Pt => &[ChannelType::CurrentLoop],
+            Self::RailCurrent => &[ChannelType::RailCurrent],
+            Self::RailVoltage => &[ChannelType::RailVoltage],
+            Self::Rtd => &[ChannelType::Rtd],
+            Self::Tc => &[ChannelType::Tc],
+            Self::Valve => &[ChannelType::ValveVoltage, ChannelType::ValveCurrent],
+        }
+    }
+}
+
+impl fmt::Display for SensorType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LoadCell => write!(f, "load_cell"),
+            Self::Pt => write!(f, "pt"),
+            Self::RailCurrent => write!(f, "rail_current"),
+            Self::RailVoltage => write!(f, "rail_voltage"),
+            Self::Rtd => write!(f, "rtd"),
+            Self::Tc => write!(f, "tc"),
+            Self::Valve => write!(f, "valve"),
+        }
+    }
+}
+
+impl FromStr for SensorType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "load_cell" => Ok(Self::LoadCell),
+            "pt" => Ok(Self::Pt),
+            "rail_current" => Ok(Self::RailCurrent),
+            "rail_voltage" => Ok(Self::RailVoltage),
+            "rtd" => Ok(Self::Rtd),
+            "tc" => Ok(Self::Tc),
+            "valve" => Ok(Self::Valve),
+            _ => Err(()),
+        }
+    }
+}
+
+#[cfg(feature = "rusqlite")]
+impl ToSql for SensorType {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::Owned(SqlValue::Text(self.to_string())))
+    }
+}
+
+#[cfg(feature = "rusqlite")]
+impl FromSql for SensorType {
+    fn column_result(value: SqlValueRef<'_>) -> FromSqlResult<Self> {
+        if let SqlValueRef::Text(text) = value {
+            let Ok(string) = std::str::from_utf8(text) else {
+                return Err(FromSqlError::InvalidType);
+            };
+
+            if let Ok(sensor_type) = SensorType::from_str(string) {
+                Ok(sensor_type)
+            } else {
+                Err(FromSqlError::InvalidType)
+            }
+        } else {
+            Err(FromSqlError::InvalidType)
+        }
+    }
+}

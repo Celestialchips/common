@@ -57,6 +57,8 @@ impl VehicleState {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, MaxSize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 /// Used in `NodeMapping` to determine which computer the action should be sent to.
 pub enum Computer {
     /// The Flight computer
@@ -134,4 +136,41 @@ pub struct NodeMapping {
     pub powered_threshold: Option<f64>,
     /// Indicator of whether the valve is normally open or normally closed.
     pub normally_closed: Option<bool>,
+}
+
+/// A sequence written in python, used by the flight computer to execute arbitray operator code.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Sequence {
+    /// The unique, human-readable name which identifies the sequence.
+    ///
+    /// If the name is "abort" specifically, the sequence should be stored by the recipient and
+    /// persisted across a machine power-down instead of run immediately.
+    pub name: String,
+    /// The script run immediately (except abort) upon being recieved.
+    pub script: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Trigger {
+    /// The unique, human-readable name which identifies the trigger.
+    pub name: String,
+    /// The condition upon which the trigger script is run, written in python.
+    pub condition: String,
+    /// The script runs when the condition is met, written in python.
+    pub script: String,
+    /// Whether or not the trigger is active.
+    pub active: bool,
+}
+
+pub enum FlightControlMessage {
+    /// A set of mappings to be applied immediately.
+    Mappings(Vec<NodeMapping>),
+    /// A message containing a sequence to be run immediately.
+    Sequence(Sequence),
+    /// A trigger to be checked by flight computer.
+    Trigger(Trigger),
+    /// Instructs the flight computer to stop a sequence named with the `String` parameter.
+    StopSequence(String),
+    /// Instructs the flight computer to run an immediate abort.
+    Abort,
 }
